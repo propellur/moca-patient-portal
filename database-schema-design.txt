@@ -1,0 +1,110 @@
+MOCA Database Schema Design
+=====================================
+
+Date: November 28, 2024
+Purpose: Document database table designs for Supabase migration
+
+========================================================================
+
+1. USERS TABLE (for patients)
+-----------------------------
+Purpose: Store patient account information
+
+Fields:
+- id: UUID PRIMARY KEY (auto-generated unique identifier)
+- email: TEXT UNIQUE NOT NULL (patient login email)
+- created_at: TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+- updated_at: TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+
+Notes:
+- Simple design to start with
+- Can expand later with profile fields (name, phone, address)
+- email is unique for login identification
+
+========================================================================
+
+2. ORDERS TABLE (matches current localStorage format)
+-----------------------------------------------------
+Purpose: Store patient medication orders
+
+Fields:
+- id: TEXT PRIMARY KEY (format: MOCA-1732722847123)
+- user_id: UUID REFERENCES users(id) (links to patient)
+- items: JSONB NOT NULL (prescription items array)
+- subtotal: DECIMAL(10,2) NOT NULL
+- shipping_fee: DECIMAL(10,2) NOT NULL DEFAULT 33.00
+- total: DECIMAL(10,2) NOT NULL
+- status: TEXT NOT NULL DEFAULT 'awaiting_payment'
+- tracking_number: TEXT NULL
+- payment_method: TEXT NOT NULL DEFAULT 'Power Board'
+- created_at: TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+- updated_at: TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+
+Status values: 'awaiting_payment', 'processing', 'shipped', 'delivered'
+
+Notes:
+- items stored as JSON to match current localStorage structure
+- id format matches existing MOCA-timestamp pattern
+- shipping_fee defaults to $33 as per user stories
+
+========================================================================
+
+3. ADMIN_USERS TABLE (for admin authentication)
+-----------------------------------------------
+Purpose: Store admin login credentials
+
+Fields:
+- id: UUID PRIMARY KEY (auto-generated unique identifier)
+- email: TEXT UNIQUE NOT NULL (admin login email)
+- password_hash: TEXT NOT NULL (encrypted password)
+- created_at: TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+
+Notes:
+- Separate from users table for security
+- password_hash stores encrypted password (never plain text)
+- Default admin: admin@moca.com
+
+========================================================================
+
+4. RELATIONSHIPS
+----------------
+- orders.user_id → users.id (many-to-one)
+  * One patient can have many orders
+  * Foreign key ensures data integrity
+  * CASCADE DELETE: if user deleted, their orders are too
+
+========================================================================
+
+5. CONSTRAINTS
+--------------
+- orders.status: CHECK constraint for valid status values
+- All email fields: UNIQUE constraint to prevent duplicates
+- NOT NULL constraints on required fields
+- Foreign key constraints for data integrity
+
+========================================================================
+
+6. INDEXES FOR PERFORMANCE
+--------------------------
+- orders.user_id (for patient order queries)
+- orders.status (for admin filtering by status)
+- orders.created_at (for date-based sorting)
+
+========================================================================
+
+7. ROW LEVEL SECURITY (RLS) POLICIES
+------------------------------------
+- Users can only see their own data
+- Admins can see all data
+- Public access denied by default
+
+========================================================================
+
+DESIGN DECISIONS MADE:
+======================
+✅ Keep users table simple for now
+✅ Store order items as JSONB (not separate table)
+✅ Use TEXT for order IDs (maintain MOCA-timestamp format)
+✅ Separate admin_users from regular users
+✅ Default shipping fee of $33.00
+✅ Include created_at/updated_at timestamps on all tables
